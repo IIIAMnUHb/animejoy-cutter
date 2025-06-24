@@ -44,9 +44,9 @@ server.on('connection', (socket) => {
             const title = pageText.split('<title>')[1].split('субтитры смотреть аниме онлайн')[0];
 
             socket.send(JSON.stringify({ a: 'log', d: 'Название получено: '+title }));
-
-
             socket.send(JSON.stringify({ a: 'log', d: 'Начинаем подготовку к скачиванию файла' }));
+
+            if(!fs.existsSync('/temp')) fs.mkdirSync('/temp');
 
             const fileId = Date.now().toString();
             const writeStream = fs.createWriteStream('temp/'+fileId+'.mp4');
@@ -92,6 +92,8 @@ server.on('connection', (socket) => {
             const time = new Date((-1000*60*60*3)+Math.floor(0+json.d.startTime*1000));
             const string = time.toTimeString();
             const name = title.replace(')','')+(title.includes('(')?`${json.d.name})`:`(${json.d.name})`)+` [${secondsToMinutes(Math.floor(json.d.startTime))} - ${secondsToMinutes(Math.floor(json.d.endTime))}]`;
+
+            if(!fs.existsSync('/ready')) fs.mkdirSync('/ready');
 
             ffmpeg('temp/'+fileId+'.mp4')
                 .setStartTime(`${string.split('').slice(0, 8).join('')}`)
