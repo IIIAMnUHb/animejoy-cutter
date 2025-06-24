@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        * {
+            margin: 0px 0px;
+            padding: 0px 0px;
+        }
+        body,html {
+            width: 100%;
+            height: 100%;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+        .up {
+            display: flex;
+            justify-content: center;
+            padding: 10px;
+        }
+        .url {
+            width: 100%;
+            height: 25px;
+            font-size: 17px;
+            padding: 0px 5px;
+        }
+        .player {
+            padding: 10px;
+        }
+        .video {
+            width: 100%;
+        }
+        .episodes {
+            padding: 10px;
+            display: flex;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+        }
+        .episode {
+            width: 38px;
+        }
+        .timeselector {
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-family: 'Arial';
+            gap: 5px;
+        }
+        .time {
+            width: 100%;
+        }
+        .time:nth-child(3) .text {
+            text-align: right;
+        }
+        .selecttime {
+            width: 100%;
+        }
+        .download {
+            height: 100%;
+            width: 100%;
+        }
+        .logs {
+            padding: 10px;
+            height: 100%;
+        }
+        .log {
+            width: 100%;
+            height: 90%;
+            resize: none;
+        }
+        .text {
+            font-family: arial;
+        }
+        .logs .text {
+            padding-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="up">
+        <input type="text" class="url" placeholder="Введите ссылку на страницу с anime-joy.ru">
+    </div>
+    <div class="player">
+        <video controls class="video"></video>
+    </div>
+    <div class="episodes">
+        <button class="episode" disabled>1</button>
+        <button class="episode" disabled>2</button>
+        <button class="episode" disabled>3</button>
+        <button class="episode" disabled>4</button>
+        <button class="episode" disabled>5</button>
+        <button class="episode" disabled>6</button>
+        <button class="episode" disabled>7</button>
+        <button class="episode" disabled>8</button>
+        <button class="episode" disabled>9</button>
+        <button class="episode" disabled>10</button>
+    </div>
+    <div class="timeselector">
+        <div class="time">
+            <p class="text" id="start">Начало: 0:00</p>
+            <button class="selecttime" id="start">Выбрать текущее</button>
+        </div>
+        <div class="time">
+            <button class="download">
+                Обрезать и скачать
+            </button>
+        </div>
+        <div class="time">
+            <p class="text" id="end">Конец: 0:00</p>
+            <button class="selecttime" id="end">Выбрать текущее</button>
+        </div>
+    </div>
+    <div class="logs">
+        <p class="text">ЛОГ ЗАГРУЗКИ</p>
+        <textarea class="log" disabled="true"></textarea>
+    </div>
+    <script>
+        const socket = new WebSocket('ws://localhost:32852/');
+        
+        const video = document.querySelector('.video');
+        const url = document.querySelector('.url');
+        const episodeElement = document.querySelector('.episodes');
+        const buttonStart = document.querySelector('button#start');
+        const buttonEnd = document.querySelector('button#end');
+        const textStart = document.querySelector('p#start');
+        const textEnd = document.querySelector('p#end');
+        const startCutting = document.querySelector('.download');
+        const log = document.querySelector('.log');
+        function writeLog(text) { 
+            log.value = log.value + (log.value?'\n':'') + text;
+            log.scrollTop = log.scrollHeight;
+            if (text.includes('Файл обрезан')) {
+                var audio = new Audio('ready.mp3');
+                audio.play();
+            }
+        };
+
+        let activePlayer = {};
+        let link = '';
+        let episodes = [];
+        
+        startCutting.addEventListener('click', () => {
+            socket.send(JSON.stringify({
+                a: 'cutVideo',
+                d: {
+                    ...activePlayer,
+                    mainUrl: link,
+                }
+            }));
+        })
+        buttonStart.addEventListener('click', () => {
+            activePlayer.startTime = video.currentTime;
+            textStart.innerHTML = `Начало: ${secondsToMinutes(Math.floor(video.currentTime))}`
+        })
+        buttonEnd.addEventListener('click', () => {
+            activePlayer.endTime = video.currentTime;
+            textEnd.innerHTML = `Конец: ${secondsToMinutes(Math.floor(video.currentTime))}`
+        })
+
+
+        url.addEventListener('change', () => {
+            if (!url.value.startsWith('https://anime-joy.ru/tv-serialy/')) {
+                if (url.value) return alert('Не верная ссылка.');
+                return
+            }
+            socket.send(JSON.stringify({
+                a: 'getEpisodes',
+                url: url.value
+            }));
+        });
+        socket.addEventListener('message', (message) => {
+            const json = JSON.parse(message.data);
+            if(json.a == 'getEpisodes') {
+                link = url.value;
+                url.value = "";
+                episodes = json.d;
+                activePlayer = {};
+                video.src = "";
+                video.load();
+                updateEpisodes();
+            }
+            if (json.a == 'getEpisodeData') {
+                activePlayer = {
+                    url: json.d.url,
+                    referer: json.d.referer,
+                    name: json.d.name
+                }
+                video.src = `http://localhost:45829/stream?url=${activePlayer.url}&referer=${activePlayer.referer}`;
+                video.load();
+            }
+            if (json.a == 'log') {
+                writeLog(json.d)
+            }
+        });
+        
+        function secondsToMinutes(sec) {
+            sec = Math.floor(sec);
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            if (h > 0) {
+                return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            } else {
+                return `${m}:${s.toString().padStart(2, '0')}`;
+            }
+        }
+        function updateEpisodes() {
+            episodeElement.innerHTML = '';
+            for(const episode of episodes) {
+                const episodeBtn = document.createElement('button');
+                episodeBtn.className = 'episode';
+                episodeBtn.textContent = episode.name.split(' ')[0];
+                episodeElement.appendChild(episodeBtn);
+                episodeBtn.addEventListener('click', () => {
+                    socket.send(JSON.stringify({
+                        a: 'getEpisodeData',
+                        url: episode.url,
+                        name: episode.name
+                    }))
+                })
+            }
+        }
+    </script>
+</body>
+</html>
