@@ -1,12 +1,18 @@
 const WebSocket = require('ws');
-const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path
+const { HTMLToJSON } = require('html-to-json-parser');
 const ffmpeg = require('fluent-ffmpeg')
+const path = require('path')
 const express = require('express');
 const request = require('request');
 const https = require('https');
 const fs = require('fs');
 const app = express();
 
+if(!fs.existsSync('./ready')) fs.mkdirSync('ready');
+if(!fs.existsSync('./temp')) fs.mkdirSync('temp');
+
+const ffmpegPath = path.join(__dirname, '..\\ffmpeg', 'ffmpeg.exe');
+console.log('FFMPEG FOUND:',ffmpegPath)
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 const PORT = 45829;
@@ -45,8 +51,6 @@ server.on('connection', (socket) => {
 
             socket.send(JSON.stringify({ a: 'log', d: 'Название получено: '+title }));
             socket.send(JSON.stringify({ a: 'log', d: 'Начинаем подготовку к скачиванию файла' }));
-
-            if(!fs.existsSync('/temp')) fs.mkdirSync('/temp');
 
             const fileId = Date.now().toString();
             const writeStream = fs.createWriteStream('temp/'+fileId+'.mp4');
@@ -92,19 +96,18 @@ server.on('connection', (socket) => {
             const time = new Date((-1000*60*60*3)+Math.floor(0+json.d.startTime*1000));
             const string = time.toTimeString();
             const name = title.replace(')','')+(title.includes('(')?`${json.d.name})`:`(${json.d.name})`)+` [${secondsToMinutes(Math.floor(json.d.startTime))} - ${secondsToMinutes(Math.floor(json.d.endTime))}]`;
-
-            if(!fs.existsSync('/ready')) fs.mkdirSync('/ready');
-
+            
             ffmpeg('temp/'+fileId+'.mp4')
                 .setStartTime(`${string.split('').slice(0, 8).join('')}`)
                 .setDuration(`${(json.d.endTime-json.d.startTime)}`)
-                .output(fileId+'.mp4')
+                .output('./ready/'+ fileId + '.mp4')
                 .on('end', function(err) {
+                    if (err) { throw new Error(err) };
                     fs.unlinkSync('temp/'+fileId+'.mp4');
-                    fs.renameSync(fileId+'.mp4', name+'.mp4')
-                    socket.send(JSON.stringify({ a: 'log', d: 'Файл обрезан ('+name+'.mp4)' }))
+                    fs.renameSync('ready/'+fileId+'.mp4', 'ready/'+name+'.mp4')
+                    socket.send(JSON.stringify({ a: 'log', d: 'Файл обрезан (ready/'+name+'.mp4)' }));
                 })
-                .on('error', err => console.log('error: ', err))
+                .on('error', err => { throw new Error(err) })
                 .run()
         }
     })
@@ -176,7 +179,6 @@ app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
 });
 
-const { HTMLToJSON } = require('html-to-json-parser');
 
 async function getPlayers(html) {
     const e = await HTMLToJSON(html, true)
