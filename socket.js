@@ -23,6 +23,7 @@ server.on('connection', (socket) => {
         const json = JSON.parse(data);
         if (json.a == 'getEpisodes') {
             const url = json.url;
+            console.log('GetEpisodesEvent',url);
             socket.send(JSON.stringify({
                 a: 'getEpisodes',
                 d: await getPlayersByLink(url)
@@ -181,7 +182,7 @@ app.listen(PORT, () => {
 
 
 async function getPlayers(html) {
-    const e = await HTMLToJSON(html, true)
+    const e = await HTMLToJSON(html, true);
     const json = JSON.parse(e);
     const content = json.content;
     const playList = content.find(e => e.attributes && e.attributes.class == 'playlists-lists');
@@ -197,9 +198,12 @@ async function getPlayers(html) {
     return mappedSibnetVideos;
 };
 async function getPlayersByLink(link) {
-    const id = link.split('/tv-serialy/')[1].split('-')[0]; 
+    const id = link.split('/tv-serialy/')[1].split('-')[0];
+    console.log('PlayersList ID', id);
     const animejoy = await fetch('https://anime-joy.ru/engine/ajax/playlists.php?news_id='+id+'&xfield=playlist');
     const json = await animejoy.json();
+    console.log('PlayersList JSON', json);
     const players = await getPlayers(json.response);
+    console.log('PlayersList Recieved', players);
     return players;
 }
