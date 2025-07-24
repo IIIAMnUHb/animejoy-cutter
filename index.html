@@ -163,14 +163,18 @@
 
 
         url.addEventListener('change', () => {
-            if (!url.value.startsWith('https://anime-joy.ru/tv-serialy/')) {
+            if (!url.value.startsWith('https://anime-joy.ru/tv-serialy/') && !url.value.startsWith('https://video.sibnet.ru/')) {
                 if (url.value) return alert('Не верная ссылка.');
                 return
             }
-            socket.send(JSON.stringify({
-                a: 'getEpisodes',
-                url: url.value
-            }));
+            if (url.value.startsWith('https://video.sibnet.ru')) {
+                socket.send(JSON.stringify({"a":"getEpisodeData","url":"https://video.sibnet.ru/shell.php?videoid="+url.value.replaceAll('.mp4','').split('/v/')[1].split('/')[1],"name":"1 серия"}))
+            } else {
+                socket.send(JSON.stringify({
+                    a: 'getEpisodes',
+                    url: url.value
+                }));
+            }
         });
         socket.addEventListener('message', (message) => {
             const json = JSON.parse(message.data);

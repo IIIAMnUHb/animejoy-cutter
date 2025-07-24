@@ -46,9 +46,14 @@ server.on('connection', (socket) => {
         if (json.a == 'cutVideo') {
             socket.send(JSON.stringify({ a: 'log', d: 'Получаем название аниме...' }));
 
-            const pageData = await fetch(json.d.mainUrl);
-            const pageText = await pageData.text();
-            const title = pageText.split('<title>')[1].split('субтитры смотреть аниме онлайн')[0];
+            let title;
+            if (!json.d.mainUrl) {
+                const pageData = await fetch(json.d.mainUrl);
+                const pageText = await pageData.text();
+                title = pageText.split('<title>')[1].split('субтитры смотреть аниме онлайн')[0];
+            } else {
+                title = 'Неопознанный эпизод'
+            }
 
             socket.send(JSON.stringify({ a: 'log', d: 'Название получено: '+title }));
             socket.send(JSON.stringify({ a: 'log', d: 'Начинаем подготовку к скачиванию файла' }));
